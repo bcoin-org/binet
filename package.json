@@ -1,0 +1,46 @@
+{
+  "name": "binet",
+  "version": "0.0.0",
+  "description": "IP address tools for javascript",
+  "keywords": [
+    "addr",
+    "address",
+    "inet",
+    "ip"
+  ],
+  "license": "MIT",
+  "repository": "git://github.com/bcoin-org/binet.git",
+  "homepage": "https://github.com/bcoin-org/binet",
+  "bugs": {
+    "url": "https://github.com/bcoin-org/binet/issues"
+  },
+  "author": "Christopher Jeffrey <chjjeffrey@gmail.com>",
+  "main": "./lib/binet.js",
+  "scripts": {
+    "browserify": "browserify -s binet lib/binet.js | uglifyjs -c > binet.js",
+    "clean": "rm -f binet.js",
+    "lint": "eslint lib/ test/ || exit 0",
+    "test": "mocha --reporter spec test/*-test.js",
+    "webpack": "webpack --config webpack.config.js"
+  },
+  "devDependencies": {
+    "babelify": "^7.3.0",
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.1",
+    "browserify": "^14.5.0",
+    "eslint": "^4.9.0",
+    "mocha": "^4.0.1",
+    "uglifyjs-webpack-plugin": "^1.0.0-beta.3",
+    "uglify-es": "^3.1.3",
+    "webpack": "^3.8.1"
+  },
+  "engines": {
+    "node": ">=7.6.0"
+  },
+  "browserify": {
+    "transform": [
+      "babelify"
+    ]
+  }
+}
