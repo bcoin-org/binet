@@ -24,7 +24,7 @@ describe('binet', function() {
     }
   });
 
-  it('convert a buffer into an ip address string', () => {
+  it('should convert a buffer into an ip address string', () => {
     const validIpV4Buffer = Buffer.from('c0a80101', 'hex');
     const invalidIpV4Buffer = Buffer.from('fffa8010111', 'hex');
     const validIpV6Buffer = Buffer.from(
@@ -40,5 +40,16 @@ describe('binet', function() {
       if (e.message !== 'Invalid IP address.')
         throw e;
     }
+  });
+
+  it('should convert back and forth', () => {
+    const ip4 = '192.168.1.1';
+    const ip6 = '2001:db8:85a3::8a2e:370:7334';
+
+    const raw4 = binet.decode(ip4);
+    const raw6 = binet.decode(ip6);
+
+    assert.strictEqual(binet.encode(raw4), ip4);
+    assert.strictEqual(binet.encode(raw6), ip6);
   });
 });
