@@ -1,6 +1,6 @@
 {
   "name": "binet",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "IP address tools for javascript",
   "keywords": [
     "addr",
