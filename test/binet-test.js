@@ -3,7 +3,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('assert');
 const binet  = require('../lib/binet');
 
 describe('binet', function() {
