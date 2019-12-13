@@ -1,3 +1,17 @@
+/**
+ * Copyright (c) 2017-2018, Christopher Jeffrey (MIT License).
+ * Copyright (c) 2019, Mark Tyneway (MIT License).
+ * Copyright (c) 2019, Sean Kilgarriff (MIT License).
+ *
+ * Parts of this software are based on bitcoin/bitcoin:
+ * Copyright (c) 2009-2019, The Bitcoin Core Developers (MIT License).
+ * Copyright (c) 2009-2019, The Bitcoin Developers (MIT License).
+ * https://github.com/bitcoin/bitcoin
+ *
+ * Resources:
+ *   https://github.com/bitcoin/bitcoin/blob/master/src/test/netbase_tests.cpp
+ */
+
 /* eslint-env mocha */
 /* eslint prefer-arrow-callback: "off" */
 
@@ -51,5 +65,38 @@ describe('binet', function() {
 
     assert.strictEqual(binet.encode(raw4), ip4);
     assert.strictEqual(binet.encode(raw6), ip6);
+  });
+
+  it('should return the correct property', () => {
+    assert(binet.isIPv4(binet.decode('127.0.0.1')));
+    assert(binet.isIPv4(binet.decode('::FFFF:192.168.1.1')));
+    assert(binet.isIPv6(binet.decode('::1')));
+    assert(binet.isRFC1918(binet.decode('10.0.0.1')));
+    assert(binet.isRFC1918(binet.decode('192.168.1.1')));
+    assert(binet.isRFC1918(binet.decode('172.31.255.255')));
+    assert(binet.isRFC3849(binet.decode('2001:0DB8::')));
+    assert(binet.isRFC3927(binet.decode('169.254.1.1')));
+    assert(binet.isRFC3964(binet.decode('2002::1')));
+    assert(binet.isRFC4193(binet.decode('FC00::')));
+    assert(binet.isRFC4380(binet.decode('2001::2')));
+    assert(binet.isRFC4843(binet.decode('2001:10::')));
+    assert(binet.isRFC4862(binet.decode('FE80::')));
+    assert(binet.isRFC6052(binet.decode('64:FF9B::')));
+    assert(
+      binet.isOnion(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca'))
+    );
+
+    // isLocal should return true for:
+    // - IPv4 loopback (127.0.0.0/8 or 0.0.0.0/8)
+    // - IPv6 loopback (::1/128)
+    assert(binet.isLocal(binet.decode('127.0.0.1')));
+    assert(binet.isLocal(binet.decode('::1')));
+    assert(binet.isLocal(binet.decode('0.1.0.0')));
+    assert(!binet.isLocal(binet.decode('1.0.0.0')));
+    assert(!binet.isLocal(binet.decode('::2')));
+
+    assert(binet.isRoutable(binet.decode('8.8.8.8')));
+    assert(binet.isRoutable(binet.decode('2001::1')));
+    assert(binet.isValid(binet.decode('127.0.0.1')));
   });
 });
