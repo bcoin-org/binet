@@ -95,6 +95,15 @@ describe('binet', function() {
     assert(!binet.isLocal(binet.decode('1.0.0.0')));
     assert(!binet.isLocal(binet.decode('::2')));
 
+    // isRFC7343 should return true for:
+    // - IPv6 ORCHIDv2 (2001:20::/28)
+    assert(binet.isRFC7343(binet.decode('2001:20::')));
+    assert(
+      binet.isRFC7343(binet.decode('2001:2f:ffff:ffff:ffff:ffff:ffff:ffff'))
+    );
+    assert(!binet.isRFC7343(binet.decode('2002:20::')));
+    assert(!binet.isRFC7343(binet.decode('0.0.0.0')));
+
     assert(binet.isRoutable(binet.decode('8.8.8.8')));
     assert(binet.isRoutable(binet.decode('2001::1')));
     assert(binet.isValid(binet.decode('127.0.0.1')));
