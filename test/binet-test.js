@@ -20,6 +20,14 @@
 const assert = require('assert');
 const binet  = require('../lib/binet');
 
+const {
+  NONE,
+  INET4,
+  INET6,
+  ONION,
+  TEREDO
+} = binet.networks;
+
 describe('binet', function() {
   it('should convert binary addresses to string addresses', () => {
     const validOnionAddress = Buffer.from(
@@ -78,7 +86,6 @@ describe('binet', function() {
     assert(binet.isRFC3927(binet.decode('169.254.1.1')));
     assert(binet.isRFC3964(binet.decode('2002::1')));
     assert(binet.isRFC4193(binet.decode('FC00::')));
-    assert(binet.isRFC4380(binet.decode('2001::2')));
     assert(binet.isRFC4843(binet.decode('2001:10::')));
     assert(binet.isRFC4862(binet.decode('FE80::')));
     assert(binet.isRFC6052(binet.decode('64:FF9B::')));
@@ -103,9 +110,23 @@ describe('binet', function() {
     );
     assert(!binet.isRFC7343(binet.decode('2002:20::')));
     assert(!binet.isRFC7343(binet.decode('0.0.0.0')));
-
+    // isRFC4380 should return true for:
+    // - IPv6 Teredo tunnelling (2001::/32)
+    assert(binet.isRFC4380(binet.decode('2001::2')));
+    assert(binet.isRFC4380(binet.decode('2001:0:ffff:ffff:ffff:ffff:ffff:ffff')));
+    assert(!binet.isRFC4380(binet.decode('2002::')));
+    assert(!binet.isRFC4380(binet.decode('2001:1:ffff:ffff:ffff:ffff:ffff:ffff')));
     assert(binet.isRoutable(binet.decode('8.8.8.8')));
     assert(binet.isRoutable(binet.decode('2001::1')));
     assert(binet.isValid(binet.decode('127.0.0.1')));
+  });
+
+  it('should getNetwork', () => {
+    assert.equal(binet.getNetwork(binet.decode('127.0.0.1')), NONE);
+    assert.equal(binet.getNetwork(binet.decode('::1')), NONE);
+    assert.equal(binet.getNetwork(binet.decode('8.8.8.8')), INET4);
+    assert.equal(binet.getNetwork(binet.decode('8888::8888')), INET6);
+    assert.equal(binet.getNetwork(binet.decode('2001::')), TEREDO);
+    assert.equal(binet.getNetwork(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca')), ONION);
   });
 });
