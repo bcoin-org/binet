@@ -93,6 +93,13 @@ describe('binet', function() {
       binet.isOnion(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca'))
     );
 
+    // isRFC2544 should return true for:
+    // - IPv4 inter-network communications (198.18.0.0/15)
+    assert(binet.isRFC2544(binet.decode('198.18.0.0')));
+    assert(binet.isRFC2544(binet.decode('198.19.255.255')));
+    assert(!binet.isRFC2544(binet.decode('198.17.255.255')));
+    assert(!binet.isRFC2544(binet.decode('198.20.5.255')));
+
     // isLocal should return true for:
     // - IPv4 loopback (127.0.0.0/8 or 0.0.0.0/8)
     // - IPv6 loopback (::1/128)
