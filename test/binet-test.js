@@ -1,24 +1,10 @@
-/**
- * Copyright (c) 2017-2018, Christopher Jeffrey (MIT License).
- * Copyright (c) 2019, Mark Tyneway (MIT License).
- * Copyright (c) 2019, Sean Kilgarriff (MIT License).
- *
- * Parts of this software are based on bitcoin/bitcoin:
- * Copyright (c) 2009-2019, The Bitcoin Core Developers (MIT License).
- * Copyright (c) 2009-2019, The Bitcoin Developers (MIT License).
- * https://github.com/bitcoin/bitcoin
- *
- * Resources:
- *   https://github.com/bitcoin/bitcoin/blob/master/src/test/netbase_tests.cpp
- */
-
-/* eslint-env mocha */
-/* eslint prefer-arrow-callback: "off" */
-
 'use strict';
 
 const assert = require('assert');
-const binet  = require('../lib/binet');
+const binet = require('../lib/binet');
+const vectors = require('./data/vectors');
+
+const allVectors = vectors.all;
 
 const {
   NONE,
@@ -64,26 +50,19 @@ describe('binet', function() {
     }
   });
 
-  it('should convert back and forth', () => {
-    const ip4 = '192.168.1.1';
-    const ip6 = '2001:db8:85a3::8a2e:370:7334';
-
-    const raw4 = binet.decode(ip4);
-    const raw6 = binet.decode(ip6);
-
-    assert.strictEqual(binet.encode(raw4), ip4);
-    assert.strictEqual(binet.encode(raw6), ip6);
+  it('should getNetwork', () => {
+    assert.equal(binet.getNetwork(binet.decode('127.0.0.1')), NONE);
+    assert.equal(binet.getNetwork(binet.decode('::1')), NONE);
+    assert.equal(binet.getNetwork(binet.decode('8.8.8.8')), INET4);
+    assert.equal(binet.getNetwork(binet.decode('8888::8888')), INET6);
+    assert.equal(binet.getNetwork(binet.decode('2001::')), TEREDO);
+    assert.equal(binet.getNetwork(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca')), ONION);
   });
 
   it('should return the correct property', () => {
     assert(binet.isIPv4(binet.decode('127.0.0.1')));
     assert(binet.isIPv4(binet.decode('::FFFF:192.168.1.1')));
     assert(binet.isIPv6(binet.decode('::1')));
-    assert(binet.isRFC1918(binet.decode('10.0.0.1')));
-    assert(binet.isRFC1918(binet.decode('192.168.1.1')));
-    assert(binet.isRFC1918(binet.decode('172.31.255.255')));
-    assert(binet.isRFC3849(binet.decode('2001:0DB8::')));
-    assert(binet.isRFC3927(binet.decode('169.254.1.1')));
     assert(binet.isRFC3964(binet.decode('2002::1')));
     assert(binet.isRFC4193(binet.decode('FC00::')));
     assert(binet.isRFC4843(binet.decode('2001:10::')));
@@ -92,13 +71,6 @@ describe('binet', function() {
     assert(
       binet.isOnion(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca'))
     );
-
-    // isRFC2544 should return true for:
-    // - IPv4 inter-network communications (198.18.0.0/15)
-    assert(binet.isRFC2544(binet.decode('198.18.0.0')));
-    assert(binet.isRFC2544(binet.decode('198.19.255.255')));
-    assert(!binet.isRFC2544(binet.decode('198.17.255.255')));
-    assert(!binet.isRFC2544(binet.decode('198.20.5.255')));
 
     // isLocal should return true for:
     // - IPv4 loopback (127.0.0.0/8 or 0.0.0.0/8)
@@ -128,12 +100,223 @@ describe('binet', function() {
     assert(binet.isValid(binet.decode('127.0.0.1')));
   });
 
-  it('should getNetwork', () => {
-    assert.equal(binet.getNetwork(binet.decode('127.0.0.1')), NONE);
-    assert.equal(binet.getNetwork(binet.decode('::1')), NONE);
-    assert.equal(binet.getNetwork(binet.decode('8.8.8.8')), INET4);
-    assert.equal(binet.getNetwork(binet.decode('8888::8888')), INET6);
-    assert.equal(binet.getNetwork(binet.decode('2001::')), TEREDO);
-    assert.equal(binet.getNetwork(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca')), ONION);
+  it('should convert back and forth', () => {
+    for (const v of allVectors) {
+      const norm = binet.normalize(v);
+      const raw = binet.decode(v);
+      const encoded = binet.encode(raw);
+
+      assert.strictEqual(encoded, norm);
+    }
+  });
+
+  describe('isNull', function() {
+    const notNull = subtract(allVectors, vectors.NULL);
+
+    it('should determine null IPs', () => {
+      for (const v of vectors.NULL) {
+        const decoded = binet.decode(v);
+
+        assert.strictEqual(binet.isNull(decoded), true,
+          `${v} is null.`);
+      }
+    });
+
+    it('should determine not-null IPs', () => {
+      for (const v of notNull) {
+        const decoded = binet.decode(v);
+
+        assert.strictEqual(binet.isNull(decoded), false,
+          `${v} is not null.`);
+      }
+    });
+  });
+
+  describe('isBroadcast', function() {
+    const notBroadcast = subtract(allVectors, vectors.BROADCAST);
+
+    it('should determine broadcast IPs', () => {
+      for (const v of vectors.BROADCAST) {
+        const decoded = binet.decode(v);
+
+        assert.strictEqual(binet.isBroadcast(decoded), true,
+          `${v} is broadcast.`);
+      }
+    });
+
+    it('should determine non-broadcast IPs', () => {
+      for (const v of notBroadcast) {
+        const decoded = binet.decode(v);
+
+        assert.strictEqual(binet.isBroadcast(decoded), false,
+          `${v} is not a broadcast.`);
+      }
+    });
+  });
+
+  describe('isRFC1918', function() {
+    const notRFC1918 = subtract(allVectors, vectors.RFC1918);
+
+    it('should determine RFC1918 IPs', () => {
+      for (const v of vectors.RFC1918) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC1918(decoded), true,
+          `${v} is RFC1918.`);
+      }
+    });
+
+    it('should determine non-RFC1918 IPs', () => {
+      for (const v of notRFC1918) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC1918(decoded), false,
+          `${v} is not RFC1918.`);
+      }
+    });
+  });
+
+  describe('isRFC2544', function() {
+    const notRFC2544 = subtract(allVectors, vectors.RFC2544);
+
+    it('should determine RFC2544 IPs', () => {
+      for (const v of vectors.RFC2544) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC2544(decoded), true,
+          `${v} is RFC2544.`);
+      }
+    });
+
+    it('should determine non-RFC2544 IPs', () => {
+      for (const v of notRFC2544) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC2544(decoded), false,
+          `${v} is not RFC2544.`);
+      }
+    });
+  });
+
+  describe('isRFC3927', function() {
+    const notRFC3927 = subtract(allVectors, vectors.RFC3927);
+
+    it('should determine RFC3927 IPs', () => {
+      for (const v of vectors.RFC3927) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC3927(decoded), true,
+          `${v} is RFC3927.`);
+      }
+    });
+
+    it('should determine non-RFC3927 IPs', () => {
+      for (const v of notRFC3927) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC3927(decoded), false,
+          `${v} is not RFC3927.`);
+      }
+    });
+  });
+
+  describe('isRFC6598', function() {
+    const notRFC6598 = subtract(allVectors, vectors.RFC6598);
+
+    it('should determine RFC6598 IPs', () => {
+      for (const v of vectors.RFC6598) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC6598(decoded), true,
+          `${v} is RFC6598.`);
+      }
+    });
+
+    it('should determine non-RFC6598 IPs', () => {
+      for (const v of notRFC6598) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC6598(decoded), false,
+          `${v} is not RFC6598.`);
+      }
+    });
+  });
+
+  describe('isRFC5737', function() {
+    const notRFC5737 = subtract(allVectors, vectors.RFC5737);
+
+    it('should determine RFC5737 IPs', () => {
+      for (const v of vectors.RFC5737) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC5737(decoded), true,
+          `${v} is RFC5737.`);
+      }
+    });
+
+    it('should determine non-RFC5737 IPs', () => {
+      for (const v of notRFC5737) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC5737(decoded), false,
+          `${v} is not RFC5737.`);
+      }
+    });
+  });
+
+  describe('isValid', function() {
+    const invalidVectors = [
+      ...vectors.SHIFTED,
+      ...vectors.NULL,
+      ...vectors.BROADCAST,
+      ...vectors.RFC3849
+    ];
+
+    const validVectors = subtract(allVectors, invalidVectors);
+
+    it('should validate valid IPs', () => {
+      for (const v of validVectors) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isValid(decoded), true,
+          `${v} is valid.`);
+      }
+    });
+
+    it('should validate invalid IPs', () => {
+      for (const v of invalidVectors) {
+        const decoded = binet.decode(v);
+
+        assert.strictEqual(binet.isValid(decoded), false,
+          `${v} is invalid.`);
+      }
+    });
+  });
+
+  describe('isRFC3849', function() {
+    const notRFC3849 = subtract(allVectors, vectors.RFC3849);
+
+    it('should determine RFC3849 IPs', () => {
+      for (const v of vectors.RFC3849) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC3849(decoded), true,
+          `${v} is valid RFC3849.`);
+      }
+    });
+
+    it('should determine non-RFC3849 IPs', () => {
+      for (const v of notRFC3849) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRFC3849(decoded), false,
+          `${v} is not RFC3849.`);
+      }
+    });
   });
 });
+
+function subtract(va, vb) {
+  const sa = new Set(va);
+
+  for (const vector of vb)
+    sa.delete(vector);
+
+  return Array.from(sa);
+}
+
+function add(va, vb) {
+  const sa = new Set(va);
+
+  for (const vector of vb)
+    sa.add(vector);
+
+  return Array.from(sa);
+}
