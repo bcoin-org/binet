@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [12.x, 14.x, 16.x]
+
+    steps:
+
+    - uses: actions/checkout@v2
+    - name: Setup ${{ matrix.node-version }}
+      uses: actions/setup-node@v2
+
+    - name: Install
+      run: npm install nyc coveralls bslint
+
+    - name: Lint
+      run: npm run lint
+
+    - name: Test
+      run: npm run test-ci
+
+    - name: Coverage
+      uses: coverallsapp/github-action@v1.1.2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
