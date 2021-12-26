@@ -17,7 +17,7 @@
   "author": "Christopher Jeffrey <chjjeffrey@gmail.com>",
   "main": "./lib/binet.js",
   "scripts": {
-    "lint": "eslint lib/ test/ || exit 0",
+    "lint": "eslint lib/ test/",
     "test": "bmocha --reporter spec test/*-test.js",
     "test-ci": "nyc --reporter lcov bmocha -- --reporter spec test/*.js"
   },
