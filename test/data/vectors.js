@@ -20,6 +20,67 @@ vectors.BROADCAST = [
   '255.255.255.255'
 ];
 
+// Local
+// 127.0.0.0/8
+// 0.0.0.0/8
+vectors.LOCAL_IPV4 = [
+  '127.0.0.0',
+  '127.0.0.1',
+  '127.255.255.255',
+  '0.0.0.0',
+  '0.0.0.1',
+  '0.1.0.1',
+  '0.255.255.255'
+];
+
+// ::1/128
+vectors.LOCAL_IPV6 = [
+  '::1'
+];
+
+vectors.LOCAL = [
+  ...vectors.LOCAL_IPV4,
+  ...vectors.LOCAL_IPV6
+];
+
+// Multicast
+//  IPv4 - RFC3171
+// 224.0.0.0/4
+vectors.MULTICAST_IPV4 = [
+  '224.0.0.0',
+  '224.0.0.1',
+  '230.100.100.100',
+  '239.255.255.255'
+];
+
+vectors.MULTICAST_IPV4_BORDERS = [
+  '223.255.255.255',
+  '240.0.0.0'
+];
+
+// IPv6 - RFC4291
+// ff00::/8
+vectors.MULTICAST_IPV6 = [
+  'ff00::',
+  'ff00::1',
+  'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'
+];
+
+vectors.MULTICAST_IPV6_BORDERS = [
+  'feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'
+];
+
+// Multicast combined
+vectors.MULTICAST = [
+  ...vectors.MULTICAST_IPV4,
+  ...vectors.MULTICAST_IPV6
+];
+
+vectors.MULTICAST_BORDERS = [
+  ...vectors.MULTICAST_IPV4_BORDERS,
+  ...vectors.MULTICAST_IPV6_BORDERS
+];
+
 // RFC 1918 - Private Internets
 // - 10/8
 // - 172.16/12
@@ -134,6 +195,7 @@ vectors.RFC3849_BORDERS = [
 vectors.RFC3964 = [
   '2002::',
   '2002::1',
+  '2002:20::',
   '2002:ffff:ffff:ffff:ffff:ffff:ffff:ffff'
 ];
 
@@ -165,7 +227,9 @@ vectors.RFC4380 = [
 
 vectors.RFC4380_BORDERS = [
   '2000:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
-  '2001:1::'
+  '2001:1::',
+  '2002::',
+  '2001:1:ffff:ffff:ffff:ffff:ffff:ffff'
 ];
 
 // RFC 4862 - IPv6 Stateless Address Autoconfiguration
@@ -182,6 +246,7 @@ vectors.RFC4862_BORDER = [
 ];
 
 // RFC 4193 - Unique Local IPv6 Unicast Addresses
+// NOTE: Make sure these tests do not include Onion
 // fc00::/7
 vectors.RFC4193 = [
   'fc00::',
@@ -199,7 +264,6 @@ vectors.RFC4193_BORDERS = [
 // RFC 6145 - IP/ICMP Translation Algorithm
 // updates RFC 2765 for IPv4 translated.
 // 0::ffff:0:0:0/96
-
 vectors.RFC6145 = [
   '0::ffff:0:0:0',
   '0::ffff:0:0:1',
@@ -214,7 +278,6 @@ vectors.RFC6145_BORDERS = [
 // RFC 4843 - An IPv6 Prefix for
 //            Overlay Routable Cryptographic Hash Identifiers (ORCHID)
 // 2001:10::/28
-
 vectors.RFC4843 = [
   '2001:10::',
   '2001:10::1',
@@ -233,18 +296,41 @@ vectors.RFC4843_BORDERS = [
 vectors.RFC7343 = [
   '2001:20::',
   '2001:20::1',
-  '2001:002f:ffff:ffff:ffff:ffff:ffff:ffff'
+  '2001:2f:ffff:ffff:ffff:ffff:ffff:ffff'
 ];
 
 vectors.RFC7343_BORDERS = [
   '2001:1f:ffff:ffff:ffff:ffff:ffff:ffff', // ORCHID v1
-  '2001:30::'
+  '2001:30::',
+  '2002:20::' // RFC 3964
+];
+
+// Onion
+// fd87:d87e:eb43::/48
+vectors.ONION = [
+  'fd87:d87e:eb43::',
+  'fd87:d87e:eb43::1',
+  'fd87:d87e:eb43:ffff:ffff:ffff:ffff:ffff'
+];
+
+vectors.ONION_BORDERS = [
+  'fd87:d87e:eb42:ffff:ffff:ffff:ffff:ffff',
+  'fd87:d87e:eb44::'
 ];
 
 // IPV4
 vectors.IPV4 = [
   '0.0.0.0',
+  '::ffff:199.200.201.202',
+
   ...vectors.BROADCAST,
+
+  // local and IPv4
+  ...vectors.LOCAL_IPV4,
+
+  // Multicast
+  ...vectors.MULTICAST_IPV4,
+  ...vectors.MULTICAST_IPV4_BORDERS,
 
   // RFC 1918
   ...vectors.RFC1918,
@@ -267,8 +353,16 @@ vectors.IPV4 = [
 
 vectors.IPV6 = [
   '::',
+
   // this is still IPv6?
   ...vectors.SHIFTED,
+
+  // local but IPv6
+  ...vectors.LOCAL_IPV6,
+
+  // Multicast
+  ...vectors.MULTICAST_IPV6,
+  ...vectors.MULTICAST_IPV6_BORDERS,
 
   ...vectors.RFC3849,
   ...vectors.RFC3849_BORDERS,
@@ -296,12 +390,41 @@ vectors.IPV6 = [
 
   ...vectors.RFC7343,
   ...vectors.RFC7343_BORDERS
+
+  // Because it's also part of RFC4193, we will test them separately.
+  // ...vectors.ONION,
+  // ...vectors.ONION_BORDERS
 ];
 
-vectors.all = [
+vectors.INVALID = [
+  ...vectors.SHIFTED,
+  ...vectors.NULL,
+  ...vectors.BROADCAST,
+  ...vectors.RFC3849
+];
+
+vectors.UNROUTABLE = [
+  ...vectors.INVALID,
+  ...vectors.RFC1918,
+  ...vectors.RFC2544,
+  ...vectors.RFC3927,
+  ...vectors.RFC4862,
+  ...vectors.RFC6598,
+  ...vectors.RFC5737,
+  ...vectors.RFC4193,
+  ...vectors.RFC4843,
+  ...vectors.RFC7343,
+  ...vectors.LOCAL
+];
+
+vectors.ALL = [
   vectors.SHIFTED,
   vectors.NULL,
   vectors.BROADCAST,
+  vectors.LOCAL,
+
+  vectors.MULTICAST,
+  vectors.MULTICAST_BORDERS,
 
   // IPv4
   vectors.RFC1918,
@@ -346,6 +469,10 @@ vectors.all = [
 
   vectors.RFC7343,
   vectors.RFC7343_BORDERS,
+
+  // Because it's also part of RFC4193, we will test them separately.
+  // vectors.ONION,
+  // vectors.ONION_BORDERS,
 
   vectors.IPV4,
   vectors.IPV6

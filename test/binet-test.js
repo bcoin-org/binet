@@ -4,15 +4,7 @@ const assert = require('assert');
 const binet = require('../lib/binet');
 const vectors = require('./data/vectors');
 
-const allVectors = vectors.all.reduce((p, c) => add(p, c));
-
-const {
-  NONE,
-  INET4,
-  INET6,
-  ONION,
-  TEREDO
-} = binet.networks;
+const allVectors = vectors.ALL.reduce((p, c) => add(p, c));
 
 describe('binet', function() {
   it('should convert binary addresses to string addresses', () => {
@@ -50,56 +42,6 @@ describe('binet', function() {
     }
   });
 
-  it('should getNetwork', () => {
-    assert.equal(binet.getNetwork(binet.decode('127.0.0.1')), NONE);
-    assert.equal(binet.getNetwork(binet.decode('::1')), NONE);
-    assert.equal(binet.getNetwork(binet.decode('8.8.8.8')), INET4);
-    assert.equal(binet.getNetwork(binet.decode('8888::8888')), INET6);
-    assert.equal(binet.getNetwork(binet.decode('2001::')), TEREDO);
-    assert.equal(binet.getNetwork(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca')), ONION);
-  });
-
-  it('should return the correct property', () => {
-    assert(binet.isIPv4(binet.decode('127.0.0.1')));
-    assert(binet.isIPv4(binet.decode('::FFFF:192.168.1.1')));
-    assert(binet.isIPv6(binet.decode('::1')));
-    assert(binet.isRFC3964(binet.decode('2002::1')));
-    assert(binet.isRFC4193(binet.decode('FC00::')));
-    assert(binet.isRFC4843(binet.decode('2001:10::')));
-    assert(binet.isRFC4862(binet.decode('FE80::')));
-    assert(binet.isRFC6052(binet.decode('64:FF9B::')));
-    assert(
-      binet.isOnion(binet.decode('FD87:D87E:EB43:edb1:8e4:3588:e546:35ca'))
-    );
-
-    // isLocal should return true for:
-    // - IPv4 loopback (127.0.0.0/8 or 0.0.0.0/8)
-    // - IPv6 loopback (::1/128)
-    assert(binet.isLocal(binet.decode('127.0.0.1')));
-    assert(binet.isLocal(binet.decode('::1')));
-    assert(binet.isLocal(binet.decode('0.1.0.0')));
-    assert(!binet.isLocal(binet.decode('1.0.0.0')));
-    assert(!binet.isLocal(binet.decode('::2')));
-
-    // isRFC7343 should return true for:
-    // - IPv6 ORCHIDv2 (2001:20::/28)
-    assert(binet.isRFC7343(binet.decode('2001:20::')));
-    assert(
-      binet.isRFC7343(binet.decode('2001:2f:ffff:ffff:ffff:ffff:ffff:ffff'))
-    );
-    assert(!binet.isRFC7343(binet.decode('2002:20::')));
-    assert(!binet.isRFC7343(binet.decode('0.0.0.0')));
-    // isRFC4380 should return true for:
-    // - IPv6 Teredo tunnelling (2001::/32)
-    assert(binet.isRFC4380(binet.decode('2001::2')));
-    assert(binet.isRFC4380(binet.decode('2001:0:ffff:ffff:ffff:ffff:ffff:ffff')));
-    assert(!binet.isRFC4380(binet.decode('2002::')));
-    assert(!binet.isRFC4380(binet.decode('2001:1:ffff:ffff:ffff:ffff:ffff:ffff')));
-    assert(binet.isRoutable(binet.decode('8.8.8.8')));
-    assert(binet.isRoutable(binet.decode('2001::1')));
-    assert(binet.isValid(binet.decode('127.0.0.1')));
-  });
-
   it('should convert back and forth', () => {
     for (const v of allVectors) {
       const norm = binet.normalize(v);
@@ -113,6 +55,8 @@ describe('binet', function() {
   const vectorTests = [
     ['isNull', 'null', binet.isNull, vectors.NULL],
     ['isBroadcast', 'broadcast', binet.isBroadcast, vectors.BROADCAST],
+    ['isLocal', 'local', binet.isLocal, vectors.LOCAL],
+
     // IPv4
     ['isRFC1918', 'RFC 1918', binet.isRFC1918, vectors.RFC1918],
     ['isRFC2544', 'RFC 2544', binet.isRFC2544, vectors.RFC2544],
@@ -134,74 +78,109 @@ describe('binet', function() {
     ['isIPV4', 'IPv4', binet.isIPv4, vectors.IPV4],
     ['isIPV6', 'IPv6', binet.isIPv6, vectors.IPV6],
 
-    // ['isValid', 'valid', vectors.VALID]
+    ['isMulticast', 'multicast', binet.isMulticast, vectors.MULTICAST],
+    ['isValid', 'invalid', v => !binet.isValid(v), vectors.INVALID],
+    ['isRoutable', 'non-routable',
+        v => !binet.isRoutable(v), vectors.UNROUTABLE]
   ];
 
   for (const [desc, name, fn, vector] of vectorTests) {
     describe(desc, function() {
-      const not = subtract(allVectors, vector);
+      const not = sub(allVectors, vector);
 
       it(`should determine ${name} IPs`, () => {
         for (const v of vector) {
           const decoded = binet.decode(v);
-          assert.strictEqual(fn(decoded), true,
-            `${v} is ${name}.`);
+          assert.strictEqual(fn(decoded), true, `${v} is ${name}.`);
         }
       });
 
       it(`should determine non-${name} IPs`, () => {
         for (const v of not) {
           const decoded = binet.decode(v);
-          assert.strictEqual(fn(decoded), false,
-            `${v} is not ${name}.`);
+          assert.strictEqual(fn(decoded), false, `${v} is not ${name}.`);
         }
       });
     });
   }
 
-  describe('isValid', function() {
-    const invalidVectors = [
-      ...vectors.SHIFTED,
-      ...vectors.NULL,
-      ...vectors.BROADCAST,
-      ...vectors.RFC3849
-    ];
+  describe('isOnion', function() {
+    const notOnion = add(
+      sub(allVectors, vectors.ONION),
+      vectors.ONION_BORDERS
+    );
 
-    const validVectors = subtract(allVectors, invalidVectors);
-
-    it('should validate valid IPs', () => {
-      for (const v of validVectors) {
+    it('should determine onion IPs', () => {
+      for (const v of vectors.ONION) {
         const decoded = binet.decode(v);
-        assert.strictEqual(binet.isValid(decoded), true,
-          `${v} is valid.`);
+        assert.strictEqual(binet.isOnion(decoded), true, `${v} is Onion.`);
       }
     });
 
-    it('should validate invalid IPs', () => {
-      for (const v of invalidVectors) {
+    // This is special case for Routable, RFC4193 is not while Onion is routable.
+    it('should be routable', () => {
+      for (const v of vectors.ONION) {
         const decoded = binet.decode(v);
+        assert.strictEqual(binet.isRoutable(decoded), true,
+          `${v} is Routable.`);
+      }
+    });
 
-        assert.strictEqual(binet.isValid(decoded), false,
-          `${v} is invalid.`);
+    it('should determine non-onion IPs', () => {
+      for (const v of notOnion) {
+        const decoded = binet.decode(v);
+        assert.strictEqual(binet.isOnion(decoded), false, `${v} is not Onion.`);
       }
     });
   });
+
+  describe('getNetwork', function() {
+    const gnVectors = {
+      NONE: add(vectors.UNROUTABLE),
+      INET4: sub(vectors.IPV4, vectors.UNROUTABLE),
+      TEREDO: vectors.RFC4380,
+      ONION: vectors.ONION,
+      INET6: sub(
+        allVectors,
+        vectors.UNROUTABLE,
+        vectors.IPV4,
+        vectors.RFC4380,
+        vectors.ONION
+      )
+    };
+
+    for (const [id, gnVector] of Object.entries(gnVectors)) {
+      it(`should get ${id}`, () => {
+        for (const v of gnVector) {
+          const d = binet.decode(v);
+          assert.strictEqual(binet.getNetwork(d), binet.networks[id],
+            `network of ${v} is ${id}.`);
+        }
+      });
+    }
+  });
 });
 
-function subtract(va, vb) {
+function sub(va, ...args) {
+  assert(args.length > 0);
   const sa = new Set(va);
 
-  for (const vector of vb)
-    sa.delete(vector);
+  for (const vb of args) {
+    for (const vector of vb)
+      sa.delete(vector);
+  }
 
   return Array.from(sa);
 }
 
-function add(va, vb) {
+function add(va, ...args) {
+  assert(args.length >= 0);
   const sa = new Set(va);
 
-  for (const vector of vb)
-    sa.add(vector);
+  for (const vb of args) {
+    for (const vector of vb)
+      sa.add(vector);
+  }
 
   return Array.from(sa);
 }
