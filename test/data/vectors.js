@@ -404,6 +404,7 @@ vectors.INVALID = [
 ];
 
 vectors.UNROUTABLE = [
+  '::',
   ...vectors.INVALID,
   ...vectors.RFC1918,
   ...vectors.RFC2544,

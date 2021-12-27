@@ -159,6 +159,94 @@ describe('binet', function() {
       });
     }
   });
+
+  describe('getReachability', function() {
+    const scores = {
+      UNREACHABLE: 0,
+      DEFAULT: 1,
+      TEREDO: 2,
+      IPV6_WEAK: 3,
+      IPV4: 4,
+      IPV6_STRONG: 5,
+      PRIVATE: 6
+    };
+
+    const IPV4s = sub(vectors.IPV4, vectors.UNROUTABLE);
+    const TEREDOs = vectors.RFC4380;
+    const ONIONs = vectors.ONION;
+    const IPV6s = sub(allVectors,
+      vectors.UNROUTABLE,
+      vectors.IPV4,
+      vectors.RFC4380,
+      vectors.RFC3964,
+      vectors.RFC6052,
+      vectors.RFC6145,
+      vectors.ONION
+    );
+
+    const testVectors = [
+      {destName: 'IPv4', destStr: IPV4s[0], srcVector: [
+        [IPV4s[1], 'IPV4', 'IPv4'],
+        [TEREDOs[0], 'DEFAULT', 'TEREDO'],
+        [ONIONs[0], 'DEFAULT', 'ONION'],
+        [IPV6s[0], 'DEFAULT', 'IPv6']
+      ]},
+      {destName: 'IPv6', destStr: IPV6s[0], srcVector: [
+        [IPV4s[0], 'IPV4', 'IPv4'],
+        [TEREDOs[0], 'TEREDO', 'TEREDO'],
+        [vectors.RFC3964[0], 'IPV6_WEAK', 'RFC3964'],
+        [vectors.RFC6052[0], 'IPV6_WEAK', 'RFC6052'],
+        [vectors.RFC6145[0], 'IPV6_WEAK', 'RFC6145'],
+        [IPV6s[0], 'IPV6_STRONG', 'IPv6'],
+        [ONIONs[0], 'DEFAULT', 'ONION']
+      ]},
+      {destName: 'ONION', destStr: ONIONs[0], srcVector: [
+        [IPV4s[0], 'IPV4', 'IPv4'],
+        [ONIONs[1], 'PRIVATE', 'ONION'],
+        [TEREDOs[0], 'DEFAULT', 'TEREDO'],
+        [IPV6s[0], 'DEFAULT', 'IPv6']
+      ]},
+      {destName: 'TEREDO', destStr: TEREDOs[0], srcVector: [
+        [TEREDOs[1], 'TEREDO', 'TEREDO'],
+        [IPV6s[0], 'IPV6_WEAK', 'IPv6'],
+        [IPV4s[0], 'IPV4', 'IPv4'],
+        [ONIONs[0], 'DEFAULT', 'ONION']
+      ]},
+      {destName: 'UNREACHABLE', destStr: vectors.UNROUTABLE[0], srcVector: [
+        [TEREDOs[1], 'TEREDO', 'TEREDO'],
+        [IPV6s[0], 'IPV6_WEAK', 'IPv6'],
+        [IPV4s[0], 'IPV4', 'IPv4'],
+        [ONIONs[0], 'PRIVATE', 'ONION']
+      ]}
+    ];
+
+    it('should return UNREACHABLE when source is not routable', () => {
+      for (const v of vectors.UNROUTABLE) {
+        const src = binet.decode(v);
+
+        // For this test, destination does not matter
+        const score = binet.getReachability(src, null);
+
+        assert.strictEqual(score, scores.UNREACHABLE,
+          `destination is UNREACHABLE from ${src}.`);
+      }
+    });
+
+    for (const {destName, destStr, srcVector} of testVectors) {
+      it(`should work with ${destName} as destionaion`, () => {
+        const dest = binet.decode(destStr);
+
+        for (const [srcStr, expected, srcName] of srcVector) {
+          const src = binet.decode(srcStr);
+          const score = binet.getReachability(src, dest);
+
+          assert.strictEqual(score, scores[expected],
+            `${srcName} to ${destName} must have ${expected} score`
+            + ` for ${srcStr}->${destStr}.`);
+        }
+      });
+    }
+  });
 });
 
 function sub(va, ...args) {
