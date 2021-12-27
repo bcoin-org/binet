@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 const binet = require('../lib/binet');
-const vectors = require('./data/vectors');
+const vectors = require('./data/ip-vectors');
 
 const allVectors = vectors.ALL.reduce((p, c) => add(p, c));
 
