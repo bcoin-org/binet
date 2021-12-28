@@ -1,10 +1,13 @@
 'use strict';
 
-const assert = require('assert');
+const assert = require('bsert');
+const bufio = require('bufio');
 const binet = require('../lib/binet');
-const vectors = require('./data/ip-vectors');
 
-const allVectors = vectors.ALL.reduce((p, c) => add(p, c));
+const ipVectors = require('./data/ip-vectors');
+const readWriteVectors = require('./data/read-write-vectors');
+
+const allVectors = ipVectors.ALL.reduce((p, c) => add(p, c));
 
 describe('binet', function() {
   it('should convert binary addresses to string addresses', () => {
@@ -52,36 +55,155 @@ describe('binet', function() {
     }
   });
 
+  it('should read IP from a buffer', () => {
+    for (const {off, size, buf, str, err} of readWriteVectors.READ) {
+      let rerr = null;
+      let rres = null;
+
+      try {
+        rres = binet.read(buf, off, size);
+      } catch (e) {
+        rerr = e;
+      }
+
+      if (err != null) {
+        assert.notStrictEqual(rerr, null, 'Expected error not found.');
+        assert.strictEqual(rerr.message, err);
+        continue;
+      }
+
+      assert.strictEqual(rerr, null);
+      assert.strictEqual(rres, str,
+        `${str} was not correctly read from ${buf.toString('hex')}`);
+    }
+  });
+
+  it('should write IP string to a buffer', () => {
+    for (const {off, size, foff, buf, str, err} of readWriteVectors.WRITE) {
+      let rerr = null;
+      let roff = null;
+      const dest = Buffer.alloc(buf.length);
+
+      try {
+        roff = binet.write(dest, str, off, size);
+      } catch (e) {
+        rerr = e;
+      }
+
+      if (err != null) {
+        assert.notStrictEqual(rerr, null, 'Expected error not found.');
+        assert.strictEqual(rerr.message, err);
+        continue;
+      }
+
+      assert.strictEqual(rerr, null);
+
+      assert.bufferEqual(dest, buf,
+        `${str} was not correctly written.`);
+      assert.strictEqual(roff, foff,
+        `Final offset for ${str} was not correct.`);
+    }
+  });
+
+  it('should read/write to a buffer writer', () => {
+    const ipv4 = [
+      '192.168.1.1',
+      '254.254.254.254'
+    ];
+    const ipv6 = [
+      'ffff::eeee'
+    ];
+
+    const expectedMin = Buffer.from(
+      'c0a80101fefefefeffff000000000000000000000000eeee', 'hex');
+    const expectedMax = Buffer.from(''
+      + '00000000000000000000ffffc0a80101'
+      + '00000000000000000000fffffefefefe'
+      + 'ffff000000000000000000000000eeee' , 'hex');
+
+    const casesMin = [
+      ['StaticWriter', new bufio.StaticWriter(4 + 4 + 16)],
+      ['BufferWriter', new bufio.BufferWriter()]
+    ];
+    const casesMax = [
+      ['StaticWriter', new bufio.StaticWriter(16 * 3)],
+      ['BufferWriter', new bufio.BufferWriter()]
+    ];
+
+    for (const [name, writer] of casesMin) {
+      binet.writeBW(writer, ipv4[0], 4);
+      binet.writeBW(writer, ipv4[1], 4);
+      binet.writeBW(writer, ipv6[0], 16);
+
+      const final = writer.render();
+      assert.bufferEqual(final, expectedMin,
+        `Could not serialize for ${name}.`);
+    }
+
+    for (const [name, writer] of casesMax) {
+      binet.writeBW(writer, ipv4[0], 16);
+      binet.writeBW(writer, ipv4[1], 16);
+      binet.writeBW(writer, ipv6[0], 16);
+
+      const final = writer.render();
+      assert.bufferEqual(final, expectedMax,
+        `Could not serialize for ${name}.`);
+    }
+
+    const readerMin = new bufio.BufferReader(expectedMin);
+    const readerMax = new bufio.BufferReader(expectedMax);
+
+    let resIPV4s = [];
+    let resIPV6s = [];
+
+    // check min first
+    resIPV4s.push(binet.readBR(readerMin, 4));
+    resIPV4s.push(binet.readBR(readerMin, 4));
+    resIPV6s.push(binet.readBR(readerMin, 16));
+
+    assert.deepStrictEqual(resIPV4s, ipv4);
+    assert.deepStrictEqual(resIPV6s, ipv6);
+
+    resIPV6s = [];
+    resIPV4s = [];
+    resIPV4s.push(binet.readBR(readerMax, 16));
+    resIPV4s.push(binet.readBR(readerMax)); // default 16
+    resIPV6s.push(binet.readBR(readerMax)); // default 16
+
+    assert.deepStrictEqual(resIPV4s, ipv4);
+    assert.deepStrictEqual(resIPV6s, ipv6);
+  });
+
   const vectorTests = [
-    ['isNull', 'null', binet.isNull, vectors.NULL],
-    ['isBroadcast', 'broadcast', binet.isBroadcast, vectors.BROADCAST],
-    ['isLocal', 'local', binet.isLocal, vectors.LOCAL],
+    ['isNull', 'null', binet.isNull, ipVectors.NULL],
+    ['isBroadcast', 'broadcast', binet.isBroadcast, ipVectors.BROADCAST],
+    ['isLocal', 'local', binet.isLocal, ipVectors.LOCAL],
 
     // IPv4
-    ['isRFC1918', 'RFC 1918', binet.isRFC1918, vectors.RFC1918],
-    ['isRFC2544', 'RFC 2544', binet.isRFC2544, vectors.RFC2544],
-    ['isRFC3927', 'RFC 3927', binet.isRFC3927, vectors.RFC3927],
-    ['isRFC6598', 'RFC 6598', binet.isRFC6598, vectors.RFC6598],
-    ['isRFC5737', 'RFC 5737', binet.isRFC5737, vectors.RFC5737],
+    ['isRFC1918', 'RFC 1918', binet.isRFC1918, ipVectors.RFC1918],
+    ['isRFC2544', 'RFC 2544', binet.isRFC2544, ipVectors.RFC2544],
+    ['isRFC3927', 'RFC 3927', binet.isRFC3927, ipVectors.RFC3927],
+    ['isRFC6598', 'RFC 6598', binet.isRFC6598, ipVectors.RFC6598],
+    ['isRFC5737', 'RFC 5737', binet.isRFC5737, ipVectors.RFC5737],
 
     // IPv6
-    ['isRFC3849', 'RFC 3849', binet.isRFC3849, vectors.RFC3849],
-    ['isRFC3964', 'RFC 3964', binet.isRFC3964, vectors.RFC3964],
-    ['isRFC6052', 'RFC 6052', binet.isRFC6052, vectors.RFC6052],
-    ['isRFC4380', 'RFC 4380', binet.isRFC4380, vectors.RFC4380],
-    ['isRFC4862', 'RFC 4862', binet.isRFC4862, vectors.RFC4862],
-    ['isRFC4193', 'RFC 4193', binet.isRFC4193, vectors.RFC4193],
-    ['isRFC6145', 'RFC 6145', binet.isRFC6145, vectors.RFC6145],
-    ['isRFC4843', 'RFC 4843', binet.isRFC4843, vectors.RFC4843],
-    ['isRFC7343', 'RFC 7343', binet.isRFC7343, vectors.RFC7343],
+    ['isRFC3849', 'RFC 3849', binet.isRFC3849, ipVectors.RFC3849],
+    ['isRFC3964', 'RFC 3964', binet.isRFC3964, ipVectors.RFC3964],
+    ['isRFC6052', 'RFC 6052', binet.isRFC6052, ipVectors.RFC6052],
+    ['isRFC4380', 'RFC 4380', binet.isRFC4380, ipVectors.RFC4380],
+    ['isRFC4862', 'RFC 4862', binet.isRFC4862, ipVectors.RFC4862],
+    ['isRFC4193', 'RFC 4193', binet.isRFC4193, ipVectors.RFC4193],
+    ['isRFC6145', 'RFC 6145', binet.isRFC6145, ipVectors.RFC6145],
+    ['isRFC4843', 'RFC 4843', binet.isRFC4843, ipVectors.RFC4843],
+    ['isRFC7343', 'RFC 7343', binet.isRFC7343, ipVectors.RFC7343],
 
-    ['isIPV4', 'IPv4', binet.isIPv4, vectors.IPV4],
-    ['isIPV6', 'IPv6', binet.isIPv6, vectors.IPV6],
+    ['isIPV4', 'IPv4', binet.isIPv4, ipVectors.IPV4],
+    ['isIPV6', 'IPv6', binet.isIPv6, ipVectors.IPV6],
 
-    ['isMulticast', 'multicast', binet.isMulticast, vectors.MULTICAST],
-    ['isValid', 'invalid', v => !binet.isValid(v), vectors.INVALID],
+    ['isMulticast', 'multicast', binet.isMulticast, ipVectors.MULTICAST],
+    ['isValid', 'invalid', v => !binet.isValid(v), ipVectors.INVALID],
     ['isRoutable', 'non-routable',
-        v => !binet.isRoutable(v), vectors.UNROUTABLE]
+        v => !binet.isRoutable(v), ipVectors.UNROUTABLE]
   ];
 
   for (const [desc, name, fn, vector] of vectorTests) {
@@ -106,12 +228,12 @@ describe('binet', function() {
 
   describe('isOnion', function() {
     const notOnion = add(
-      sub(allVectors, vectors.ONION),
-      vectors.ONION_BORDERS
+      sub(allVectors, ipVectors.ONION),
+      ipVectors.ONION_BORDERS
     );
 
     it('should determine onion IPs', () => {
-      for (const v of vectors.ONION) {
+      for (const v of ipVectors.ONION) {
         const decoded = binet.decode(v);
         assert.strictEqual(binet.isOnion(decoded), true, `${v} is Onion.`);
       }
@@ -119,7 +241,7 @@ describe('binet', function() {
 
     // This is special case for Routable, RFC4193 is not while Onion is routable.
     it('should be routable', () => {
-      for (const v of vectors.ONION) {
+      for (const v of ipVectors.ONION) {
         const decoded = binet.decode(v);
         assert.strictEqual(binet.isRoutable(decoded), true,
           `${v} is Routable.`);
@@ -136,16 +258,16 @@ describe('binet', function() {
 
   describe('getNetwork', function() {
     const gnVectors = {
-      NONE: add(vectors.UNROUTABLE),
-      INET4: sub(vectors.IPV4, vectors.UNROUTABLE),
-      TEREDO: vectors.RFC4380,
-      ONION: vectors.ONION,
+      NONE: add(ipVectors.UNROUTABLE),
+      INET4: sub(ipVectors.IPV4, ipVectors.UNROUTABLE),
+      TEREDO: ipVectors.RFC4380,
+      ONION: ipVectors.ONION,
       INET6: sub(
         allVectors,
-        vectors.UNROUTABLE,
-        vectors.IPV4,
-        vectors.RFC4380,
-        vectors.ONION
+        ipVectors.UNROUTABLE,
+        ipVectors.IPV4,
+        ipVectors.RFC4380,
+        ipVectors.ONION
       )
     };
 
@@ -171,17 +293,17 @@ describe('binet', function() {
       PRIVATE: 6
     };
 
-    const IPV4s = sub(vectors.IPV4, vectors.UNROUTABLE);
-    const TEREDOs = vectors.RFC4380;
-    const ONIONs = vectors.ONION;
+    const IPV4s = sub(ipVectors.IPV4, ipVectors.UNROUTABLE);
+    const TEREDOs = ipVectors.RFC4380;
+    const ONIONs = ipVectors.ONION;
     const IPV6s = sub(allVectors,
-      vectors.UNROUTABLE,
-      vectors.IPV4,
-      vectors.RFC4380,
-      vectors.RFC3964,
-      vectors.RFC6052,
-      vectors.RFC6145,
-      vectors.ONION
+      ipVectors.UNROUTABLE,
+      ipVectors.IPV4,
+      ipVectors.RFC4380,
+      ipVectors.RFC3964,
+      ipVectors.RFC6052,
+      ipVectors.RFC6145,
+      ipVectors.ONION
     );
 
     const testVectors = [
@@ -194,9 +316,9 @@ describe('binet', function() {
       {destName: 'IPv6', destStr: IPV6s[0], srcVector: [
         [IPV4s[0], 'IPV4', 'IPv4'],
         [TEREDOs[0], 'TEREDO', 'TEREDO'],
-        [vectors.RFC3964[0], 'IPV6_WEAK', 'RFC3964'],
-        [vectors.RFC6052[0], 'IPV6_WEAK', 'RFC6052'],
-        [vectors.RFC6145[0], 'IPV6_WEAK', 'RFC6145'],
+        [ipVectors.RFC3964[0], 'IPV6_WEAK', 'RFC3964'],
+        [ipVectors.RFC6052[0], 'IPV6_WEAK', 'RFC6052'],
+        [ipVectors.RFC6145[0], 'IPV6_WEAK', 'RFC6145'],
         [IPV6s[0], 'IPV6_STRONG', 'IPv6'],
         [ONIONs[0], 'DEFAULT', 'ONION']
       ]},
@@ -212,7 +334,7 @@ describe('binet', function() {
         [IPV4s[0], 'IPV4', 'IPv4'],
         [ONIONs[0], 'DEFAULT', 'ONION']
       ]},
-      {destName: 'UNREACHABLE', destStr: vectors.UNROUTABLE[0], srcVector: [
+      {destName: 'UNREACHABLE', destStr: ipVectors.UNROUTABLE[0], srcVector: [
         [TEREDOs[1], 'TEREDO', 'TEREDO'],
         [IPV6s[0], 'IPV6_WEAK', 'IPv6'],
         [IPV4s[0], 'IPV4', 'IPv4'],
@@ -221,7 +343,7 @@ describe('binet', function() {
     ];
 
     it('should return UNREACHABLE when source is not routable', () => {
-      for (const v of vectors.UNROUTABLE) {
+      for (const v of ipVectors.UNROUTABLE) {
         const src = binet.decode(v);
 
         // For this test, destination does not matter

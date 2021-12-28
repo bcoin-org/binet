@@ -8,6 +8,7 @@
 
 const vectors = exports;
 
+// [bits, offset, expected buffer, from string]
 vectors.PTON4 = [
   [4 * 8, 0, Buffer.from('01020304', 'hex'), '1.2.3.4'],
   [4 * 8, 0, Buffer.from('81010101', 'hex'), '129.1.1.1'],
@@ -34,7 +35,7 @@ vectors.PTON4 = [
   [4 * 8, 0, Buffer.from('11223340', 'hex'), '0x1122334']
 ];
 
-// returned code, buffer size, offset, string
+// [code, buffer size, offset, string]
 vectors.PTON4_MALFORMED = [
   [-1, 4, 0, ''],
   [-1, 4, 0, ' '],
@@ -72,6 +73,7 @@ vectors.PTON4_MALFORMED = [
   [-1, 4, 0, '255.255.255.255.100']
 ];
 
+// [bits, offset, expected buffer, from string]
 vectors.PTON6 = [
   [16 * 8, 0, Buffer.alloc(16), '::'],
   [16 * 8, 0, Buffer.from('00000000000000000000000000000001', 'hex'), '::1'],
@@ -86,7 +88,7 @@ vectors.PTON6 = [
     '1234:1234:1234:1234:1234:1234:1234:1234']
 ];
 
-// returned code, buffer size, offset, string
+// [code, buffer size, offset, string]
 vectors.PTON6_MALFORMED = [
   [-1, 16, 0, '12:34::ff/240'],
   [-1, 16, 0, '12:34::ff/02'],
