@@ -5,7 +5,7 @@ const bufio = require('bufio');
 const binet = require('../lib/binet');
 
 const ipVectors = require('./data/ip-vectors');
-const readWriteVectors = require('./data/read-write-vectors');
+const otherVectors = require('./data/other-vectors');
 
 const allVectors = ipVectors.ALL.reduce((p, c) => add(p, c));
 
@@ -56,7 +56,7 @@ describe('binet', function() {
   });
 
   it('should read IP from a buffer', () => {
-    for (const {off, size, buf, str, err} of readWriteVectors.READ) {
+    for (const {off, size, buf, str, err} of otherVectors.READ) {
       let rerr = null;
       let rres = null;
 
@@ -79,7 +79,7 @@ describe('binet', function() {
   });
 
   it('should write IP string to a buffer', () => {
-    for (const {off, size, foff, buf, str, err} of readWriteVectors.WRITE) {
+    for (const {off, size, foff, buf, str, err} of otherVectors.WRITE) {
       let rerr = null;
       let roff = null;
       const dest = Buffer.alloc(buf.length);
@@ -368,6 +368,190 @@ describe('binet', function() {
         }
       });
     }
+  });
+
+  describe('Mappings', function() {
+    it('should map 4 byte ip to IPv6', () => {
+      for (const vector of otherVectors.MAP_VECTORS) {
+        const mapped = binet.map(vector[0]);
+
+        assert.bufferEqual(mapped, vector[1]);
+      }
+    });
+
+    it('should fail mapping non-4 ip to IPv6', () => {
+      for (let i = 0; i < 20; i++) {
+        if (i === 4 || i === 16)
+          continue;
+
+        assert.throws(() => {
+          binet.map(Buffer.alloc(i));
+        }, {
+          message: 'Not an IPv4 address.'
+        });
+      }
+    });
+
+    it('should unmap IPv6 mapped to IPv4', () => {
+      for (const vector of otherVectors.UNMAP_VECTOR) {
+        const unmapped = binet.unmap(vector[0]);
+
+        assert.bufferEqual(unmapped, vector[1]);
+      }
+    });
+
+    it('should fail unmapping non-mapped IPs', () => {
+      // incorrect sizes
+      for (let i = 0; i < 20; i++) {
+        if (i === 4 || i === 16)
+          continue;
+
+        assert.throws(() => {
+          binet.unmap(Buffer.alloc(i));
+        }, {
+          message: 'Not an IPv6 address.'
+        });
+      }
+    });
+
+    it('should fail unmapping non-mapped IPv6s', () => {
+      for (const vector of otherVectors.UNMAPPED_VECTOR) {
+        assert.throws(() => {
+          binet.unmap(vector);
+        }, {
+          message: 'Not an IPv4 mapped address.'
+        });
+      }
+    });
+
+    it('should check mapped string', () => {
+      for (const vector of otherVectors.IS_MAPPED_STRING) {
+        assert.strictEqual(binet.isMappedString(vector[0]), vector[1]);
+      }
+    });
+  });
+
+  describe('String type', function() {
+    const {types} = binet;
+
+    const none = [
+      '',
+      '1'.repeat(255 + 1),
+      '1'.repeat(100)
+    ];
+
+    const all = add(
+      ipVectors.IPV4,
+      ipVectors.IPV6,
+      ipVectors.ONION,
+      otherVectors.LEGACY_ONIONS,
+      none
+    );
+
+    it('should return none', () => {
+      assert.strictEqual(binet.getTypeString(''), types.NONE);
+      assert.strictEqual(binet.getTypeString('1'.repeat(255 + 1)), types.NONE);
+      assert.strictEqual(binet.getTypeString('1'.repeat(100)), types.NONE);
+    });
+
+    it('should return IPv4', () => {
+      for (const vector of ipVectors.IPV4)
+        assert.strictEqual(binet.getTypeString(vector), types.INET4);
+    });
+
+    it('should return IPv6', () => {
+      for (const vector of ipVectors.IPV6)
+        assert.strictEqual(binet.getTypeString(vector), types.INET6);
+    });
+
+    it('should return ONION', () => {
+      for (const vector of otherVectors.LEGACY_ONIONS)
+        assert.strictEqual(binet.getTypeString(vector), types.ONION);
+    });
+
+    it('should check isIPv4String', () => {
+      const not = sub(all, ipVectors.IPV4);
+
+      for (const vector of ipVectors.IPV4)
+        assert.strictEqual(binet.isIPv4String(vector), true);
+
+      for (const vector of not)
+        assert.strictEqual(binet.isIPv4String(vector), false);
+    });
+
+    it('should check isIPv6String', () => {
+      const not = sub(all, ipVectors.IPV6);
+
+      for (const vector of ipVectors.IPV6)
+        assert.strictEqual(binet.isIPv6String(vector), true);
+
+      for (const vector of not)
+        assert.strictEqual(binet.isIPv6String(vector), false);
+    });
+
+    it('should check isOnionString', () => {
+      const onions = add(otherVectors.LEGACY_ONIONS, ipVectors.ONION);
+      const not = sub(all, onions);
+
+      for (const vector of onions)
+        assert.strictEqual(binet.isOnionString(vector), true);
+
+      for (const vector of not)
+        assert.strictEqual(binet.isOnionString(vector), false);
+    });
+
+    it('should check isUnknownString', () => {
+      const not = sub(all, none);
+
+      for (const vector of none)
+        assert.strictEqual(binet.isUnknownString(vector), true);
+
+      for (const vector of not)
+        assert.strictEqual(binet.isUnknownString(vector), false);
+    });
+
+    it('should check isIPString', () => {
+      const notIPString = add(ipVectors.NONE, otherVectors.LEGACY_ONIONS);
+
+      // check inet4
+      for (const vector of ipVectors.IPV4)
+        assert.strictEqual(binet.isIPString(vector), types.INET4);
+
+      for (const vector of ipVectors.IPV6)
+        assert.strictEqual(binet.isIPString(vector), types.INET6);
+
+      for (const vector of notIPString)
+        assert.strictEqual(binet.isIPString(vector), types.NONE);
+    });
+  });
+
+  describe('Host string', function() {
+    it('should convert toHost string', () => {
+      for (const vector of otherVectors.TOHOST) {
+        const host = binet.toHost(vector[0], vector[1], vector[2]);
+
+        assert.strictEqual(host, vector[3]);
+      }
+    });
+
+    it('should fail toHost', () => {
+      for (const vector of otherVectors.TOHOST_ERR) {
+        let err;
+        try {
+          binet.toHost(vector[0], vector[1], vector[2]);
+        } catch (e) {
+          err = e;
+        }
+
+        assert(err, `Error not found: ${err}`);
+
+        if (!vector[3])
+          assert.strictEqual(err instanceof assert.AssertionError, true, err);
+
+        if (vector[3])
+          assert.strictEqual(err.message, vector[3]);
+      }
+    });
   });
 });
 

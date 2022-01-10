@@ -1,10 +1,92 @@
 'use strict';
 
-/*
- * Some extra vectors for the options and etc.
- */
+const binet = require('../..');
 
 const vectors = exports;
+
+/*
+ * Map/Unmap
+ */
+
+vectors.MAP_VECTORS = [
+  [binet.ZERO_IPV6, binet.ZERO_IPV6],
+  [Buffer.alloc(16, 1), Buffer.alloc(16, 1)],
+  [binet.ZERO_IPV4, binet.ZERO_IPV4],
+  [Buffer.alloc(4, 0), binet.ZERO_IPV4],
+  [
+    Buffer.from('00000000000000000000fffffefefefe', 'hex'),
+    Buffer.from('00000000000000000000fffffefefefe', 'hex')
+  ], [
+    Buffer.from('fefefefe', 'hex'),
+    Buffer.from('00000000000000000000fffffefefefe', 'hex')
+  ], [
+    Buffer.from('ffffffff', 'hex'),
+    Buffer.from('00000000000000000000ffffffffffff', 'hex')
+  ], [
+    // NOTE: Maybe it should fail if RAW is not mapped and is unmappable?
+    Buffer.from('ffffffffffffffffffffffffffffffff', 'hex'),
+    Buffer.from('ffffffffffffffffffffffffffffffff', 'hex')
+  ]
+];
+
+// these are mapped ips
+vectors.UNMAP_VECTOR = [
+  [Buffer.alloc(4, 0), Buffer.alloc(4, 0)],
+  [Buffer.alloc(4, 0xff), Buffer.alloc(4, 0xff)],
+  [binet.ZERO_IPV4, Buffer.alloc(4, 0)],
+  [
+    Buffer.from('00000000000000000000ffffffffffff', 'hex'),
+    Buffer.from('ffffffff', 'hex')
+  ]
+];
+
+// isMappedString tests
+vectors.IS_MAPPED_STRING = [
+  ['127.0.0.1', false],
+  ['0.0.0.0', false],
+  ['255.255.255.255', false],
+  ['hello', false],
+  ['::', false],
+  ['::1', false],
+  ['::ffff:ffff', false],
+  ['::f:ffff:ffff', false],
+  ['::ff:ffff:ffff', false],
+  ['::fff:ffff:ffff', false],
+  ['::1:ffff:ffff:ffff', false],
+  ['1::ffff:ffff:ffff', false],
+  ['::ffff:ffff:ffff', true],
+  ['::ffff:0000:0000', true]
+];
+
+// These are not mapped.
+vectors.UNMAPPED_VECTOR = [
+  binet.ZERO_IPV6,
+  Buffer.from('000000000000000000000000ffffffff', 'hex'),
+  Buffer.from('00000000000000000000000fffffffff', 'hex'),
+  Buffer.from('0000000000000000000000ffffffffff', 'hex'),
+  Buffer.from('000000000000000000000fffffffffff', 'hex'),
+  Buffer.from('00000000000000000001ffffffffffff', 'hex'),
+  Buffer.from('10000000000000000000ffffffffffff', 'hex'),
+  Buffer.from('f0000000000000000000ffff00000000', 'hex'),
+  Buffer.from('ffffffffffffffffffffffff00000000', 'hex'),
+  Buffer.from('ffffffffffffffffffffffffffffffff', 'hex')
+];
+
+/*
+ * Small onion address set
+ */
+vectors.LEGACY_ONIONS = [
+  '0000000000000000.onion',
+  'aaaaaaaaaaaaaaaa.onion',
+  'ffffffffffffffff.onion',
+  'zzzzzzzzzzzzzzzz.onion',
+  'abcdefghijklmnop.onion',
+  'qrstuvwxyz234567.onion'
+];
+
+/*
+ * READ/WRITE Vectors
+ */
 
 // NOTE: str needs to be normalized.
 vectors.READ = [
@@ -220,4 +302,46 @@ vectors.WRITE = [
   ...vectors.WRITE_4,
   ...vectors.WRITE_6,
   ...vectors.WRITE_ONION
+];
+
+/*
+ * toHost/fromHost tests
+ */
+
+// host, port, key, returned val
+vectors.TOHOST = [
+  ['handshake', 0, null, 'handshake:0'],
+  ['handshake', 0xffff, null, 'handshake:65535'],
+  ['::1', 1000, null, '[::1]:1000'],
+  ['127.0.0.1', 1000, null, '127.0.0.1:1000'],
+  ['0.0.0.0', 1000, null, '0.0.0.0:1000'],
+
+  // do we need more strict rules in toHost?
+  ['---', 1000, null, '---:1000'],
+  ['handshake', 1000, Buffer.alloc(33, 0), 'handshake:1000'],
+  ['handshake', 1000, Buffer.alloc(33, 0x11),
+    'ceirceirceirceirceirceirceirceirceirceirceirceirceirc@handshake:1000']
+];
+
+// host, port, key, thrown err message - null = assertion error.
+vectors.TOHOST_ERR = [
+  // bad hostnames
+  ['', 1000, null, 'Invalid host (zero length).'],
+  ['a'.repeat(255 + 1 + 5 + 1), 1000, null, 'Invalid host (too large).'],
+  ['[::]', 1000, null, 'Bad host.'],
+  ['hsd@handshake-org', 1000, null, 'Bad host.'],
+  ['handshake\n', 1000, null, 'Bad host.'],
+  ['handshake\u0019', 1000, null, 'Bad host.'],
+  ['handshake\u007f', 1000, null, 'Bad host.'],
+  ['not-an-ipv6:addr', 1000, null, 'Unexpected colon.'],
+  ['not-an-ipv6:1000', 1000, null, 'Unexpected colon.'],
+
+  // bad ports
+  ['handshake', null, null, null],
+  ['handshake', -1, null, null],
+  ['handshake', 0xffff + 1, null, null],
+
+  // bad keys
+  ['handshake', 100, 'not-a-key', null],
+  ['handshake', 100, Buffer.alloc(0), null]
 ];
