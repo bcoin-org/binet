@@ -1,6 +1,7 @@
 'use strict';
 
 const binet = require('../..');
+const {types} = binet;
 
 const vectors = exports;
 
@@ -309,7 +310,7 @@ vectors.WRITE = [
  */
 
 // host, port, key, returned val
-vectors.TOHOST = [
+vectors.TO_HOST = [
   ['handshake', 0, null, 'handshake:0'],
   ['handshake', 0xffff, null, 'handshake:65535'],
   ['::1', 1000, null, '[::1]:1000'],
@@ -324,7 +325,7 @@ vectors.TOHOST = [
 ];
 
 // host, port, key, thrown err message - null = assertion error.
-vectors.TOHOST_ERR = [
+vectors.TO_HOST_ERR = [
   // bad hostnames
   ['', 1000, null, 'Invalid host (zero length).'],
   ['a'.repeat(255 + 1 + 5 + 1), 1000, null, 'Invalid host (too large).'],
@@ -344,4 +345,103 @@ vectors.TOHOST_ERR = [
   // bad keys
   ['handshake', 100, 'not-a-key', null],
   ['handshake', 100, Buffer.alloc(0), null]
+];
+
+// host, returned object.
+vectors.FROM_HOST = [
+  ['[::1]', null, null, {
+    host: '::1',
+    type: types.INET6,
+    port: 0,
+    hostname: '[::1]:0',
+    key: null
+  }],
+  ['[::1]:1000', null, null, {
+    host: '::1',
+    type: types.INET6,
+    port: 1000,
+    hostname: '[::1]:1000',
+    key: null
+  }],
+  ['::1', null, null, {
+    host: '::1',
+    type: types.INET6,
+    port: 0,
+    hostname: '[::1]:0',
+    key: null
+  }],
+  // hm.. Should it ? TODO: Fix this?
+  ['::ffff:ffff', null, null, {
+    host: '::255.255.255.255',
+    type: types.INET6,
+    port: 0,
+    hostname: '[::255.255.255.255]:0',
+    key: null
+  }],
+  ['handshake', null, null, {
+    host: 'handshake',
+    type: types.NONE,
+    port: 0,
+    hostname: 'handshake:0',
+    key: null
+  }], [
+    'ceirceirceirceirceirceirceirceirceirceirceirceirceirc@handshake:1000',
+    null,
+    null,
+    {
+      host: 'handshake',
+      type: types.NONE,
+      port: 1000,
+      hostname: 'handshake:1000',
+      key: Buffer.alloc(33, 0x11)
+    }
+  ],
+
+  // fallbacks
+  ['handshake', 1000, null, {
+    host: 'handshake',
+    port: 1000,
+    type: types.NONE,
+    hostname: 'handshake:1000',
+    key: null
+  }],
+  ['127.0.0.1', 1000, Buffer.alloc(33, 0x11), {
+    host: '127.0.0.1',
+    port: 1000,
+    type: types.INET4,
+    hostname: '127.0.0.1:1000',
+    key: Buffer.alloc(33, 0x11)
+  }]
+];
+
+// host, fport, fkey, returned err or null if assertion error
+vectors.FROM_HOST_ERR = [
+  // bad host
+  ['', null, null, 'Invalid host (zero length).'],
+  ['.'.repeat(53 + 1 + 255 + 1 + 5 + 1), null, null, 'Invalid host (too large).'],
+  [':100', null, null, 'Invalid host (zero length).'],
+
+  // bad host/ipv6
+  ['[::1', null, null, 'IPv6 bracket mismatch.'],
+  ['[[::1]', null, null, 'Invalid IPv6 address.'],
+  ['[hello]', null, null, 'Invalid IPv6 address.'],
+
+  // bad port
+  ['hello:hey', null, null, 'Invalid port (bad character).'],
+  ['hello:0001', null, null, 'Invalid port (leading zero).'],
+  ['hello:65536', null, null, 'Invalid port (overflow).'],
+  ['hello:', null, null, 'Invalid port (bad size).'],
+
+  // bad key
+  ['f'.repeat(54) + '@handshake:1000', null, null, 'Invalid identity key (too large).'],
+  ['test@handshake:1000', null, null, 'Invalid base32 string.'],
+  ['jbswy3dp@handshake:1000', null, null, 'Invalid identity key (bad size).'],
+
+  // bad fallback port
+  ['handshake:1000', -1, null, null],
+  ['handshake:1000', 0xffff + 1, null, null],
+
+  // bad fallback key
+  ['handshake:1000', 1000, 'not-a-key', null],
+  ['handshake:1000', 1000, Buffer.alloc(0), 'Invalid fallback key (bad size).']
 ];

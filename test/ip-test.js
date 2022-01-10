@@ -527,7 +527,7 @@ describe('binet', function() {
 
   describe('Host string', function() {
     it('should convert toHost string', () => {
-      for (const vector of otherVectors.TOHOST) {
+      for (const vector of otherVectors.TO_HOST) {
         const host = binet.toHost(vector[0], vector[1], vector[2]);
 
         assert.strictEqual(host, vector[3]);
@@ -535,7 +535,7 @@ describe('binet', function() {
     });
 
     it('should fail toHost', () => {
-      for (const vector of otherVectors.TOHOST_ERR) {
+      for (const vector of otherVectors.TO_HOST_ERR) {
         let err;
         try {
           binet.toHost(vector[0], vector[1], vector[2]);
@@ -543,12 +543,63 @@ describe('binet', function() {
           err = e;
         }
 
-        assert(err, `Error not found: ${err}`);
+        assert(err, `Error not found: ${err}.`);
 
-        if (!vector[3])
+        if (vector[3] === null)
           assert.strictEqual(err instanceof assert.AssertionError, true, err);
+        else
+          assert.strictEqual(err.message, vector[3]);
+      }
+    });
 
-        if (vector[3])
+    it('should get object fromHost (toHost vectors)', () => {
+      for (const vector of otherVectors.TO_HOST) {
+        const info = binet.fromHost(vector[3]);
+
+        assert.strictEqual(info.host, vector[0]);
+        assert.strictEqual(info.port, vector[1]);
+
+        if (info.key)
+          assert.bufferEqual(info.key, vector[2]);
+      }
+    });
+
+    it('should get object fromHost', () => {
+      for (const vector of otherVectors.FROM_HOST) {
+        const expected = vector[3];
+        const info = binet.fromHost(vector[0], vector[1], vector[2]);
+
+        // no need to test raw, we have ton of tests above.
+        assert.strictEqual(info.host, expected.host, vector[0]);
+        assert.strictEqual(info.hostname, expected.hostname, vector[0]);
+        assert.strictEqual(info.port, expected.port, vector[0]);
+        assert.strictEqual(info.type, expected.type, vector[0]);
+
+        // if key is not a buffer, it must not exist.
+        if (!Buffer.isBuffer(info.key))
+          assert.strictEqual(info.key, expected.key);
+        else
+          assert.bufferEqual(info.key, expected.key);
+      }
+    });
+
+    it('should fail fromHost', () => {
+      for (const vector of otherVectors.FROM_HOST_ERR) {
+        let err;
+        try {
+          binet.fromHost(vector[0], vector[1], vector[2]);
+        } catch (e) {
+          err = e;
+        }
+
+        const msg = 'Error not found, expecting '
+          + `"${vector[3] ? vector[3] : 'AssertionError'}".`;
+
+        assert(err, msg);
+
+        if (vector[3] === null)
+          assert.strictEqual(err instanceof assert.AssertionError, true, err);
+        else
           assert.strictEqual(err.message, vector[3]);
       }
     });
