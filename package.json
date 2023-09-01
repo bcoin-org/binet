@@ -23,13 +23,13 @@
     "test-ci": "nyc --reporter lcov bmocha -- --reporter spec test/*.js"
   },
   "dependencies": {
-    "bs32": "~0.1.5",
+    "bs32": "~0.1.7",
     "bsert": "~0.0.12"
   },
   "devDependencies": {
     "bmocha": "^2.1.8",
     "bts-type-deps": "^0.0.3",
-    "bufio": "^1.2.0"
+    "bufio": "^1.2.1"
   },
   "engines": {
     "node": ">=8.0.0"
